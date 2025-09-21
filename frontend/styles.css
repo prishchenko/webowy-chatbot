@@ -1,0 +1,619 @@
+/* 1) Fonty (@font-face) */
+@font-face {
+  font-family: "Inter";
+  src: url("styles/fonts/Inter-VariableFont_opsz,wght.ttf") format("truetype");
+  font-weight: 100 900;   
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Inter";
+  src: url("styles/fonts/Inter-Italic-VariableFont_opsz,wght.ttf") format("truetype");
+  font-weight: 100 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* 2) Reset i bazowe (button/input/placeholder/*) */
+button, input, textarea, select {
+  font: inherit;
+}
+
+::placeholder { 
+  font: inherit; opacity: .6; 
+}
+
+*, *::before, *::after { 
+  box-sizing: border-box; margin: 0; padding: 0; 
+}
+
+/* 3) Zmienne :root */
+:root {
+  --color-bg:          #f6f7f8;
+  --color-surface:     #ffffff;
+  --color-chat-bg:     #fafafa;
+  --color-sidebar-bg:  #f7f8f9;
+  --color-border:      #e6e8ec;
+  --color-text-strong: #1f2937;
+  --color-hover:       rgba(15,23,42,.06);
+  --color-primary:     #eef6f2;
+  --color-secondary:   #dcebe3;
+  --color-user-msg:    #eaf6ef;
+  --color-bot-msg:     #f1f3f5;
+  --color-input-border:        var(--color-border);
+  --color-input-border-focus:  #5e9275;
+  --color-focus-ring:          rgba(118,168,138,.30);
+  --color-drop-outline: #888;
+  --shadow-drop-from:   rgba(0,0,0,.08);
+  --shadow-drop-to:     rgba(0,0,0,.06);
+  --sidebar-w: 250px;
+  --header-icon-box: 40px;
+  --bot-icon-size: 32px;
+  --chevron-icon-size: 32px;
+  --ease: cubic-bezier(.4,.25,.25,1);
+  --dur-fast: .12s;
+  --dur: .3s;
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto,
+               "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans",
+               "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif;
+}
+
+
+/* 4) Global (body, html) */
+body {
+  background-color: var(--color-bg);
+  font-family: var(--font-sans);
+  font-optical-sizing: auto;
+  min-height: 100vh;
+  overflow: auto;
+  font-synthesis: none;
+  font-variant-numeric: tabular-nums;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 5) Layout (app-container, sidebar, chat-container, chat-window) */
+.app-container {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+@supports (height: 100dvh) {
+  .app-container { height: 100dvh; }
+}
+
+.sidebar {
+  flex-shrink: 0;
+  width: var(--sidebar-w);
+  background-color: var(--color-sidebar-bg);
+  border-right: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  transition: padding var(--dur) var(--ease);
+  z-index: 2;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.chat-container {
+  flex: 1 1 auto;
+  display: flex; 
+  flex-direction: column;
+  background-color: var(--color-surface);
+  min-width: 0;
+  min-height: 0; 
+  height: 100%;
+}
+
+.chat-window {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+  background-color: var(--color-chat-bg);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  scroll-behavior: smooth;
+  scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  overflow-anchor: none;
+}
+
+/* 6) Komponenty (sidebar-header, actions, list, item, input, bubbles) */
+.sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  min-height: var(--header-icon-box);
+}
+
+.sidebar-overlay {
+  display: none;
+}
+
+.bot-icon-btn,
+.collapse-button {
+  width: var(--header-icon-box);
+  height: var(--header-icon-box);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  line-height: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.bot-icon {
+  width: var(--bot-icon-size);
+  height: var(--bot-icon-size);
+}
+#sidebarToggleIcon {
+  width: var(--chevron-icon-size);
+  height: var(--chevron-icon-size);
+}
+
+.bot-icon, #sidebarToggleIcon {
+  display: block;
+}
+
+.sidebar-actions {
+  margin-bottom: 20px;
+  min-height: 44px;
+}
+
+.new-chat-btn, .new-chat-icon-btn {
+  display: flex; 
+  align-items: center; 
+  gap: 8px;
+  padding: 10px;
+  background-color: var(--color-primary);
+  border: none; 
+  border-radius: 6px;
+  cursor: pointer;
+  transform-origin: center;
+  font-size: 14px; 
+  color: var(--color-text-strong);
+}
+.new-chat-btn { 
+  width: 100%; 
+}
+.new-chat-icon-btn { 
+  width: auto; 
+  justify-content: center;
+}
+.new-chat-btn:hover, 
+.new-chat-icon-btn:hover { 
+  background-color: var(--color-secondary); 
+}
+
+.chat-history {
+  list-style: none;
+  flex: 1;
+  margin: 0; 
+  padding: 0;
+  scrollbar-width: thin;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.chat-item {
+  display: flex; 
+  align-items: center;
+  padding: 10px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color var(--dur) var(--ease);
+  margin-bottom: 4px;
+}
+
+.chat-item span {
+  flex: 1;
+  white-space: nowrap; 
+  overflow: hidden; 
+  text-overflow: ellipsis;
+  font-size: 14px; 
+  padding-left: 8px;
+}
+
+.delete-chat-btn {
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  opacity: .8;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+}
+.delete-chat-btn:hover,
+.delete-chat-btn:focus-visible {
+  opacity: 1;
+}
+.delete-chat-btn img { 
+  width: 16px; 
+  height: 16px; 
+}
+
+.chat-input {
+  display: flex; 
+  align-items: center;
+  padding: 12px 16px;
+  border-top: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+  padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  gap: 8px;
+}
+.chat-input input {
+  flex: 1; 
+  padding: 12px 16px;
+  border: 1px solid var(--color-input-border);
+  border-radius: 24px;
+  font-size: 15px; 
+  outline: none;
+  transition: border-color var(--dur) var(--ease);
+}
+.chat-input input:focus {
+  border-color: var(--color-input-border-focus);
+  box-shadow: 0 0 0 3px var(--color-focus-ring);
+}
+.chat-input input:disabled { 
+  background: #f3f4f6; 
+  cursor: not-allowed; 
+}
+
+.attach-button, .send-button {
+  background: none; 
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 50%;
+  display: flex; 
+  align-items: center; 
+  justify-content: center;
+}
+.attach-button:hover, .send-button:hover { 
+  background-color: var(--color-hover); 
+}
+.attach-button img, .send-button img { 
+  width: 24px; 
+  height: 24px; 
+}
+
+.send-button, .attach-button, .new-chat-btn, .new-chat-icon-btn, .delete-chat-btn {
+  transition:
+    transform var(--dur-fast) var(--ease),
+    background-color var(--dur) var(--ease),
+    opacity var(--dur) var(--ease);
+}
+
+.send-button:active, .attach-button:active, .new-chat-btn:active, .new-chat-icon-btn:active {
+  transform: scale(.96);
+}
+
+.user {
+  align-self: flex-end;
+  background-color: var(--color-user-msg);
+  border-bottom-right-radius: 4px;
+  max-width: 80%;
+  padding: 12px 16px;
+  border-radius: 16px;
+  word-wrap: break-word;
+  line-height: 1.5;
+}
+.bot {
+  align-self: flex-start;
+  background-color: var(--color-bot-msg);
+  border-bottom-left-radius: 4px;
+  max-width: 80%;
+  padding: 12px 16px;
+  border-radius: 16px;
+  word-wrap: break-word;
+  line-height: 1.5;
+}
+.chat-window > p.user {
+  animation: bubbleInUser 240ms var(--ease) both;
+  will-change: transform, opacity;
+}
+.chat-window > p.bot {
+  animation: bubbleInBot 240ms var(--ease) both;
+  will-change: transform, opacity;
+}
+
+/* 7) Stany i interakcje (hover/focus/disabled/hidden) */
+.chat-item[aria-current="true"] { 
+  background: var(--color-secondary); 
+}
+
+.chat-item:hover { 
+  background-color: var(--color-hover);
+}
+.chat-item[aria-current="true"]:hover {
+  background: var(--color-secondary);
+}
+
+.delete-chat-btn:hover { 
+  background-color: var(--color-hover);
+}
+.delete-chat-btn:active {
+  transform: scale(.96);
+}
+
+
+.send-button[disabled], 
+.attach-button[disabled] {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+.bot-icon-btn:focus-visible,
+.collapse-button:focus-visible,
+.new-chat-btn:focus-visible,
+.new-chat-icon-btn:focus-visible,
+.delete-chat-btn:focus-visible,
+.chat-item:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-focus-ring) inset;
+  border-radius: 10px;
+}
+
+.collapse-button:hover,
+.sidebar.hidden #botIconBtn:hover {
+  background-color: var(--color-hover);
+  border-radius: 10px;
+}
+.sidebar.hidden #botIconBtn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-focus-ring) inset;
+  background-color: transparent;
+  border-radius: 10px;
+}
+
+
+.sidebar.hidden {
+  width: 60px;
+  padding: 8px;
+  align-items: center;
+}
+
+.sidebar.hidden .chat-item span,
+.sidebar.hidden .delete-chat-btn,
+.sidebar.hidden .new-chat-btn .label { 
+  display: none; 
+}
+.sidebar.hidden .chat-item {
+  justify-content: center; 
+  padding: 10px 0;
+}
+
+.sidebar.hidden .new-chat-btn { 
+  display: none; 
+}
+.sidebar.hidden .new-chat-icon-btn {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 50%;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.sidebar.hidden .new-chat-icon-btn img {
+  width: 24px;
+  height: 24px;
+}
+.sidebar.hidden .collapse-button { 
+  display: none !important; 
+}
+.sidebar.hidden .chat-history { 
+  display: none !important; 
+}
+
+
+.sidebar:not(.hidden) .new-chat-icon-btn { 
+  display: none; 
+}
+
+/* 8) Utilities (no-drop, .busy, .drop) */
+.no-drop { 
+  cursor: not-allowed; 
+}
+.no-drop * { 
+  pointer-events: none; 
+}
+
+.chat-input.drop,
+.chat-window.drop {
+  outline: 2px dashed var(--color-drop-outline);
+  background: var(--color-hover);
+  animation: dropPulse 900ms ease-in-out infinite alternate;
+  outline-offset: -4px;
+}
+
+.user, .bot { 
+  white-space: pre-wrap;
+  word-break: break-word;
+  hyphens: auto;
+  transition: transform .12s var(--ease), box-shadow .12s var(--ease);
+}
+
+
+
+.user:hover, .bot:hover { 
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0,0,0,.06);
+}
+
+.chat-item .chat-title, 
+.new-chat-btn .label { 
+  font-weight: 500;
+}
+
+.bot.thinking::after {
+  content: "…";
+  display: inline-block;
+  width: 1.2em;
+  text-align: left;
+  animation: dots 1.2s steps(3, end) infinite;
+}
+
+/* 9) Animacje (@keyframes) */
+
+@keyframes dropPulse {
+  from { 
+    box-shadow: 0 0 0 0 var(--shadow-drop-from); 
+  }
+  to { 
+    box-shadow: 0 0 0 6px var(--shadow-drop-to); 
+  }
+}
+
+@keyframes dots {
+  0% { content: " "; }
+  33% { content: "."; }
+  66% { content: ".."; }
+  100% { content: "..."; }
+}
+
+@keyframes bubbleInUser {
+  from { 
+    opacity: 0; 
+    transform: translateX(8px) translateY(4px) scale(.98); 
+  }
+  to { 
+    opacity: 1; 
+    transform: none; 
+  }
+}
+@keyframes bubbleInBot {
+  from { 
+    opacity: 0; 
+    transform: translateX(-8px) translateY(4px) scale(.98); 
+  }
+  to { 
+    opacity: 1; 
+    transform: none; 
+  }
+}
+
+
+/* 10) Media queries */
+@media (max-width: 768px) {
+  .sidebar:not(.hidden) {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 1000;
+    box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+    width: 85%;
+    max-width: 300px;
+  }
+  
+  .delete-chat-btn { opacity: .7; }
+
+  .app-container {
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .chat-container {
+    width: 100%;
+  }
+
+ .sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 999;
+  }
+  
+  .sidebar:not(.hidden) ~ .sidebar-overlay { display: block; }
+
+}
+@media (min-width: 769px) {
+  .sidebar.hidden .sidebar-header {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .sidebar.hidden { 
+    width: 48px; 
+  }
+  
+  .sidebar:not(.hidden) {
+    width: 92vw;
+    max-width: none;
+  }
+
+  
+  .chat-window {
+    padding: 12px;
+  }
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+  * { 
+    animation: none !important; 
+    transition: none !important; 
+  }
+  html { 
+    scroll-behavior: auto; 
+  }
+  .chat-window { 
+    scroll-behavior: auto; 
+  }
+  .user:hover, .bot:hover { 
+    transform: none; 
+    box-shadow: none; 
+  }
+}
+
+@media (max-width: 380px) {
+  :root {
+    --header-icon-box: 36px;
+    --bot-icon-size: 28px;
+    --chevron-icon-size: 28px;
+  }
+
+  .sidebar { padding: 12px; }
+  .sidebar-actions { gap: 8px; }
+
+  .new-chat-btn .label { display: none; }
+  .new-chat-btn { justify-content: center; padding: 8px; }
+
+  .chat-item { padding: 8px 6px; gap: 6px; }
+  .chat-item span { font-size: 13px; }
+  .delete-chat-btn { width: 24px; height: 24px; }
+  .delete-chat-btn img { width: 18px; height: 18px; }
+
+  .chat-input { padding: 10px 8px; gap: 6px; }
+  .chat-input input {
+    min-width: 0;
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+  .attach-button, .send-button {
+    width: 40px; height: 40px;
+    padding: 4px;
+  }
+  .attach-button img, .send-button img { width: 20px; height: 20px; }
+
+  .chat-window { padding: 12px; }
+}
