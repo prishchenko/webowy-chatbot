@@ -174,13 +174,6 @@ tmp/
 .env.local
 *.secret
 
-# Jeśli kiedyś użyjesz frontowego toolingu
-node_modules/
-dist/
-build/
-.parcel-cache/
-.eslintcache
-
 
 # Dane lokalne / artefakty
 uploads/
