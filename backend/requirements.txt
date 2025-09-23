@@ -9,3 +9,5 @@ qdrant-client
 numpy
 python-dotenv
 requests
+starlette
+anyio
