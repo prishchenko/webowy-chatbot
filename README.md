@@ -38,13 +38,11 @@ python -m http.server 5500
 
 ## Struktura projektu
 project/
-│
 ├── frontend/
 │   ├── index.html
 │   ├── styles.css
 │   ├── chatbot.js
 │   └── styles/
-│
 ├── backend/
 │   ├── app.py
 │   ├── qdrant_utils.py
@@ -52,6 +50,5 @@ project/
 │   ├── document_parser.py
 │   ├── llm.py
 │   ├── requirements.txt
-│   └── .env   (lokalne, nie commitować)
-│
+│   └── .env   # lokalne, nie commitować
 └── README.md
