@@ -37,18 +37,22 @@ python -m http.server 5500
 ##### 5) Otwórz: http://localhost:5500/frontend/
 
 ## Struktura projektu
-project/
-├── frontend/
-│   ├── index.html
-│   ├── styles.css
-│   ├── chatbot.js
-│   └── styles/
-├── backend/
-│   ├── app.py
-│   ├── qdrant_utils.py
-│   ├── embeddings.py
-│   ├── document_parser.py
-│   ├── llm.py
-│   ├── requirements.txt
-│   └── .env   # lokalne, nie commitować
-└── README.md
+project/  
+│  
+├── frontend/  
+│   ├── index.html  
+│   ├── styles.css  
+│   ├── chatbot.js  
+│   └── styles/  
+│  
+│  
+├── backend/  
+│   ├── app.py (FastAPI)  
+│   ├── qdrant_utils.py  
+│   ├── embeddings.py  
+│   ├── document_parser.py  
+│   ├── llm.py  
+│   ├── .env  
+│   └── requirements.txt  
+│  
+└── README.md  
