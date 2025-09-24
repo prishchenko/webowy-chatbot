@@ -1,1 +1,1 @@
-window.API_BASE = 'https://';
+window.API_BASE = 'https://webowy-chatbot.onrender.com';
