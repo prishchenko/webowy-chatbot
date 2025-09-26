@@ -17,10 +17,16 @@ from qdrant_utils import (
     connect, ensure_collection, ensure_payload_indexes,
     upsert_chunks, search as qsearch, COLLECTION
 )
+def _env_list(name: str, default: str) -> list[str]:
+    return [o.strip().rstrip("/") for o in os.getenv(name, default).split(",") if o.strip()]
 
 app = FastAPI(title="Chatbot API (Qdrant Cloud)", description="Czat + upload + embeddingi + CMS")
-ALLOW_ORIGINS = [o.strip() for o in os.getenv("ALLOW_ORIGINS","http://localhost:5500,http://127.0.0.1:5500").split(",") if o.strip()]
-ALLOW_CREDENTIALS = not ("*" in ALLOW_ORIGINS)
+ALLOW_ORIGINS = _env_list(
+    "ALLOW_ORIGINS",
+    "http://127.0.0.1:5500,http://localhost:5500,https://prishchenko.github.io"
+)
+
+ALLOW_CREDENTIALS = False
 
 app.add_middleware(
     CORSMiddleware,
