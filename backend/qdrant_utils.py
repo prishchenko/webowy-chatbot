@@ -2,9 +2,16 @@ import uuid
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
 from qdrant_client.http.models import VectorParams as HttpVectorParams
-from qdrant_client.http.models import Filter, FieldCondition, MatchValue, PayloadSchemaType
-COLLECTION = "chat_chunks"
+from qdrant_client.http.models import Filter, FieldCondition, MatchValue, PayloadSchemaType, FilterSelector
 
+COLLECTION = "chat_chunks"
+def delete_session(client, session_id: str):
+    f = Filter(must=[FieldCondition(key="session_id", match=MatchValue(value=session_id))])
+    client.delete(
+        collection_name=COLLECTION,
+        points_selector=FilterSelector(filter=f),
+        wait=True
+    )
 def connect(url: str, api_key: str | None = None):
     return QdrantClient(url=url, api_key=api_key)
 def ensure_payload_indexes(client):

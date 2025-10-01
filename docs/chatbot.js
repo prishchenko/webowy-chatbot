@@ -15,17 +15,45 @@
   const sendBtn = document.querySelector('.send-button');
   const attachBtn = document.querySelector('.attach-button');
   const chatInputBar = document.querySelector('.chat-input');
+  const API_TIMEOUT_MS = 30000;
+  const WAKE_TIMEOUT_MS = 90000;
+
   let hiddenFileInput;
   let isBusy = false;
   let chats = {};
-  let currentChatId = localStorage.getItem('currentChatId') || crypto.randomUUID();
+  let currentChatId = null;
   let saveTimer = null;
 
 
-  async function apiFetch(url, opts = {}, { withChatId = true } = {}) {
+
+  function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+  async function fetchWithTimeout(url, opts = {}, timeout = API_TIMEOUT_MS){
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), timeout);
+    try {
+      return await fetch(url, { ...opts, signal: ctl.signal });
+    } finally {
+      clearTimeout(t);
+    }
+  }
+
+  async function wakeBackend(){
+    try {
+      const res = await fetchWithTimeout(`${API_BASE}/health`, {}, WAKE_TIMEOUT_MS);
+      if (res.ok) return true;
+    } catch (_) { }
+    await sleep(3000);
+    return false;
+  }
+
+
+
+
+  async function apiFetch(url, opts = {}, { chatId = currentChatId, timeout = API_TIMEOUT_MS } = {}) {
     const headers = { ...(opts.headers || {}) };
-    if (withChatId && currentChatId) headers['X-Chat-Id'] = currentChatId;
-    return fetch(url, { ...opts, headers });
+    if (chatId) headers['X-Chat-Id'] = chatId;
+    return fetchWithTimeout(url, { ...opts, headers }, timeout);
   }
 
   function scrollToBottom() {
@@ -42,11 +70,13 @@
 
   function setBusy(busy) {
     isBusy = busy;
-    userInput && (userInput.disabled = busy);
-  attachBtn && (attachBtn.disabled = busy);
-  hiddenFileInput && (hiddenFileInput.disabled = busy);
-  chatWindow?.classList.toggle('no-drop', busy);
-  chatInputBar?.classList.toggle('no-drop', busy);
+    if (userInput) {
+    userInput.readOnly = busy;
+    }
+    attachBtn && (attachBtn.disabled = busy);
+    hiddenFileInput && (hiddenFileInput.disabled = busy);
+    chatWindow?.classList.toggle('no-drop', busy);
+    chatInputBar?.classList.toggle('no-drop', busy);
     syncSendEnabled();
   }
   
@@ -163,13 +193,20 @@
     deleteBtn.innerHTML = '<img src="styles/images/svg/delete_24dp_1F1F1F_FILL0_wght400_GRAD0_opsz24.svg" alt="" aria-hidden="true" />';
 
 
-    deleteBtn.addEventListener('click', e => {
+    deleteBtn.addEventListener('click', async e => {
       e.stopPropagation();
       delete chats[id];
       const wasActive = currentChatId === id;
       li.remove();
       saveDebounced();
-
+      try {
+        await apiFetch(`${API_BASE}/purge`,
+          { method: 'DELETE' },
+          { chatId: id }
+        );
+      } catch (err) {
+        console.warn('Purge w Qdrant nie powiódł się:', err);
+      }
       if (wasActive) {
         const next = chatHistory.querySelector('.chat-item');
         if (next) next.click();
@@ -203,14 +240,17 @@
     return li;
   }
 
-  function addMessage(text, sender, save = true, doScroll = true) {
+  function addMessage(text, sender, save = true, doScroll = true, chatId = currentChatId) {
     const p = document.createElement('p');
     p.classList.add(sender === 'user' ? 'user' : 'bot');
     p.textContent = text;
-    chatWindow.appendChild(p);
-    if (doScroll) scrollToBottom();
-    if (save && currentChatId) {
-      chats[currentChatId].messages.push({ text, sender });
+
+    if (chatId === currentChatId) {
+      chatWindow.appendChild(p);
+      if (doScroll) scrollToBottom();
+    }
+    if (save && chatId && chats[chatId]) {
+      chats[chatId].messages.push({ text, sender });
       saveDebounced();
     }
     return p;
@@ -223,7 +263,7 @@
       return;
     }
     chats[chatId].messages.forEach(msg => {
-      addMessage(msg.text, msg.sender, false, false);
+      addMessage(msg.text, msg.sender, false, false, chatId);
     });
     scrollToBottom();
   }
@@ -264,30 +304,31 @@
 
 
 
-  async function askBackend(text) {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 30_000);
+  async function askBackend(text, chatId) {
+    const makeReq = () => apiFetch(`${API_BASE}/ask`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question: text })
+    }, { chatId });
+
     try {
-      const res = await apiFetch(`${API_BASE}/ask`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: text, chat_id: currentChatId }),
-        signal: ctrl.signal
-      });
-
+      const res = await makeReq();
       const raw = await res.text();
-      let data = null;
-      try { data = raw ? JSON.parse(raw) : null; } catch {} 
-
-      if (!res.ok) {
-        throw new Error(data?.detail || `Błąd ${res.status}`);
-      }
+      let data = null; try { data = raw ? JSON.parse(raw) : null; } catch {}
+      if (!res.ok) throw new Error(data?.detail || `Błąd ${res.status}`);
       return data ?? { answer: '' };
     } catch (e) {
-      if (e.name === 'AbortError') throw new Error('Przekroczono czas odpowiedzi');
+      const isTimeout = e?.name === 'AbortError' || /czas odpowiedzi/i.test(String(e?.message || ''));
+      if (isTimeout) {
+        addMessage("Budzenie serwera… spróbuję ponownie.", 'bot', false, true, chatId);
+        await wakeBackend();
+        const res2 = await makeReq();
+        const raw2 = await res2.text();
+        let data2 = null; try { data2 = raw2 ? JSON.parse(raw2) : null; } catch {}
+        if (!res2.ok) throw new Error(data2?.detail || `Błąd ${res2.status}`);
+        return data2 ?? { answer: '' };
+      }
       throw e;
-    } finally {
-      clearTimeout(timer);
     }
   }
 
@@ -296,8 +337,9 @@
     if (isBusy) return;
     setBusy(true);
 
-    const loader = addMessage(`Wgrywam: ${file.name}…`, 'bot', false);
-
+    const opChatId = currentChatId;
+    const loader = (opChatId === currentChatId) ? addMessage(`Wgrywam: ${file.name}`, 'bot', false, false, opChatId) : null;
+    if (loader) loader.classList.add('thinking');
     const normalizePayload = (payload) => {
       const normItem = (it, i) => {
         if (typeof it === 'string') return { id: `item_${i+1}`, text: it };
@@ -317,44 +359,65 @@
       throw new Error('Nieprawidłowy kształt JSON');
     };
 
-
+    async function withRetry(doRequest, kind = 'operacja') {
+      try { return await doRequest(); }
+      catch (e) {
+        const isTimeout = e?.name === 'AbortError' || /aborted|czas odpowiedzi|timeout/i.test(String(e));
+        if (!isTimeout) throw e;
+        if (loader && currentChatId === opChatId) loader.textContent = `Budzenie serwera… spróbuję ponownie (${kind}).`;
+        await wakeBackend();
+        return await doRequest();
+      }
+    }
 
     try {
-    if (file.name.toLowerCase().endsWith('.json')) {
-      const raw = await file.text();
-      const body = normalizePayload(JSON.parse(raw));
-      const res = await apiFetch(`${API_BASE}/cms`, {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify(body)
-      });
-      const text = await res.text();
-      let info = null; try { info = text ? JSON.parse(text) : null; } catch {}
-      if (!res.ok) throw new Error(info?.detail || `Błąd ${res.status}`);
-      
-      loader.remove();
-      addMessage(`Zaimportowano ${info?.count ?? 0} fragmentów z ${file.name}`, 'bot', true);
-    } else {
-      const fd = new FormData();
-      fd.append('file', file);
-      fd.append('chat_id', currentChatId);
-      const res = await apiFetch(`${API_BASE}/upload`, { method: 'POST', body: fd });
-      const text = await res.text();
-      let info = null; try { info = text ? JSON.parse(text) : null; } catch {}
-      if (!res.ok) throw new Error(info?.detail || `Błąd ${res.status}`);
-      loader.remove();
-      addMessage(`Wgrano: ${info?.filename ?? file.name} (${info?.size_bytes ?? '—'} B)`, 'bot', true);
-    }
+      if (file.name.toLowerCase().endsWith('.json')) {
+        const raw = await file.text();
+        const body = normalizePayload(JSON.parse(raw));
+        const doRequest = () => apiFetch(`${API_BASE}/cms`, {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify(body)
+        }, { chatId: opChatId, timeout: 120_000 });
+
+        const res = await withRetry(doRequest, 'import JSON');
+        const text = await res.text();
+        let info = null; try { info = text ? JSON.parse(text) : null; } catch {}
+        if (!res.ok) throw new Error(info?.detail || `Błąd ${res.status}`);
+        if (loader && currentChatId === opChatId) loader.remove();
+
+        addMessage(`Zaimportowano ${info?.count ?? 0} fragmentów z ${file.name}`, 'bot', true, true, opChatId);
+
+      } else {
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('chat_id', opChatId);
+
+        const doRequest = () => apiFetch(`${API_BASE}/upload`,
+          { method: 'POST', body: fd },
+          { chatId: opChatId, timeout: 120_000 } 
+        );
+
+        const res = await withRetry(doRequest, 'upload pliku');
+        const text = await res.text();
+        let info = null; try { info = text ? JSON.parse(text) : null; } catch {}
+        if (!res.ok) throw new Error(info?.detail || `Błąd ${res.status}`);
+
+        if (loader && currentChatId === opChatId) loader.remove();
+        addMessage(`Wgrano: ${info?.filename ?? file.name} (${info?.size_bytes ?? '—'} B)`, 'bot', true, true, opChatId);
+      }
+
     } catch (e) {
       console.error(e);
-
-      loader.remove();
-      addMessage(`Błąd uploadu/importu: ${e.message || e}`, 'bot', true);
+      if (loader && currentChatId === opChatId) loader.remove();
+      addMessage('Błąd uploadu/importu: serwer odpowiada z opóźnieniem (zimny start). Wyślij plik/pytanie ponownie.', 'bot', true, true, opChatId);
     } finally {
       setBusy(false);
+      userInput.focus();
       scrollToBottom();
     }
   }
+
 
   function wireDropZone(el) {
     if (!el) return;
@@ -460,6 +523,7 @@
   chatForm.addEventListener('submit', async e => {
     e.preventDefault();
     if (isBusy) return;
+
     const msg = userInput.value.trim();
     if (!msg) { 
       userInput.value = '';
@@ -468,33 +532,31 @@
       return;
     }
 
+    const opChatId = currentChatId;
     setBusy(true);
 
-    addMessage(msg, 'user', true);
+    addMessage(msg, 'user', true, true, opChatId);
     userInput.value = '';
 
-    const loaderEl = addMessage('Myślę', 'bot', false);
-    loaderEl.classList.add('thinking');
+    const loaderEl = (opChatId === currentChatId) ? addMessage('Myślę', 'bot', false, false, opChatId) : null;
+    if (loaderEl) loaderEl.classList.add('thinking');
     
     try {
-      const data = await askBackend(msg);
-      
-      loaderEl.remove();
+      const data = await askBackend(msg, opChatId);
 
-      
+      if (loaderEl && currentChatId === opChatId) loaderEl.remove();
       const answerText = data.answer || 'Brak odpowiedzi';
-      addMessage(answerText, 'bot', true);
+      addMessage(answerText, 'bot', true, true, opChatId);
 
-      
-      if (data.sources && data.sources.length) {
-        addMessage("Źródła:\n- " + data.sources.join("\n- "), 'bot', true);
+      if (data.sources?.length) {
+        addMessage("Źródła:\n- " + data.sources.join("\n- "), 'bot', true, true, opChatId);
       }
     } catch (err) {
-      console.error(err);
-      loaderEl.remove();
-      addMessage('Błąd API. Czy backend działa na http://127.0.0.1:8000?', 'bot', true);
+      if (loaderEl && currentChatId === opChatId) loaderEl.remove();
+      addMessage('Serwer chwilowo nie odpowiada. Spróbuj ponownie za chwilę.', 'bot', true, true, opChatId);
     } finally {
       setBusy(false);
+      userInput.focus();
       scrollToBottom();
     }
   });
